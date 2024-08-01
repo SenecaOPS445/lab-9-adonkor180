@@ -1,0 +1,68 @@
+---
+- name: Configure OPS445 Linux VM
+  hosts: vmlab
+  become: yes
+  vars:
+    seneca_id: "adonkor"
+    ssh_key_src: "/home/albertappiahdonkor/.ssh/id_rsa.pub"
+
+  tasks:
+    - name: Update Apache HTTP Server to the latest version
+      yum:
+	name: httpd
+        state: latest
+
+    - name: Install EPEL repository
+      yum:
+	name: epel-release
+        state: present
+
+    - name: Remove the tree package
+      yum:
+	name: tree
+        state: absent
+
+    - name: Set the hostname to Seneca ID
+      hostname:
+        name: "{{ seneca_id }}"
+
+    - name: Ensure the new user with sudo access exists
+      user:
+	name: "{{ seneca_id }}"
+        state: present
+        shell: /bin/bash
+        groups: wheel
+        append: yes
+
+    - name: Allow sudo without password for the new user
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: "^{{ seneca_id }}"
+        line: "{{ seneca_id }} ALL=(ALL) NOPASSWD:ALL"
+        validate: 'visudo -cf %s'
+
+    - name: Create .ssh directory for the new user
+      file:
+        path: "/home/{{ seneca_id }}/.ssh"
+        state: directory
+        owner: "{{ seneca_id }}"
+        group: "{{ seneca_id }}"
+        mode: '0700'
+
+    - name: Copy SSH public key to authorized_keys
+      copy:
+	src: "{{ ssh_key_src }}"
+        dest: "/home/{{ seneca_id }}/.ssh/authorized_keys"
+        owner: "{{ seneca_id }}"
+        group: "{{ seneca_id }}"
+        mode: '0600'
+
+    - name: Create directory structure for labs
+      file:
+	path: "/home/{{ seneca_id }}/ops445/lab{{ item }}"
+        state: directory
+        owner: "{{ seneca_id }}"
+        group: "{{ seneca_id }}"
+        mode: '0755'
+      loop: "{{ range(1, 10) | list }}"
